@@ -6,9 +6,22 @@ import { UserModule } from './user/user.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthController } from './app.controller';
 import { RedisModule } from './redis/redis.module';
+import { ConfigModule } from '@nestjs/config';
+import { envValidationSchema } from './config/env.validation';
 
 @Module({
-  imports: [AuthModule, UserModule, DatabaseModule, RedisModule],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+      validationSchema: envValidationSchema,
+      validationOptions: { abortEarly: true },
+    }),
+    AuthModule,
+    UserModule,
+    DatabaseModule,
+    RedisModule,
+  ],
   controllers: [AppController, HealthController],
   providers: [AppService],
 })

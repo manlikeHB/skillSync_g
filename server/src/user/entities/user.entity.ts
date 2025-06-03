@@ -1,11 +1,18 @@
-
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { UserRole } from '../enums/user-role.enum';
 import { ResetToken } from 'src/auth/entities/reset-token.entity';
 
 @Entity()
 export class User {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @Column({ unique: true })
   email: string;
@@ -13,12 +20,18 @@ export class User {
   @Column()
   password: string;
 
-  @OneToMany(() => ResetToken, (token) => token.user)
-  resetTokens: ResetToken[];
+  @Column()
+  name: string;
+
+  @Column({ type: 'enum', enum: UserRole })
+  role: UserRole;
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => ResetToken, (token) => token.user)
+  resetTokens: ResetToken[];
 }

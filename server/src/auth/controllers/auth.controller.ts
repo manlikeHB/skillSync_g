@@ -10,7 +10,7 @@ import { Request } from 'express';
 import { AuthService } from '../services/auth.service';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
-import { JwtAuthGuard } from '../guard/jwt.auth.guard';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { TokenBlacklistService } from '../token-blacklist.service';
 import {
   ApiTags,

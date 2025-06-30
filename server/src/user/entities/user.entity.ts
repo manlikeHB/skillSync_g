@@ -34,4 +34,7 @@ export class User {
 
   @OneToMany(() => ResetToken, (token) => token.user)
   resetTokens: ResetToken[];
+
+  @Column({ type: 'float', default: 0 })
+  reputationScore: number;
 }

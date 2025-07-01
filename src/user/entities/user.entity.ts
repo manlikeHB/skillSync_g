@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
   OneToMany,
 } from 'typeorm';
-import { ResetToken } from 'src/auth/entities/reset-token.entity';
+import { ResetToken } from '../../auth/entities/reset-token.entity';
 import { UserRole } from '../enums/user-role.enum';
 
 @Entity()

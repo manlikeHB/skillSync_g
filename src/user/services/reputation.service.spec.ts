@@ -3,6 +3,7 @@ import { ReputationService } from './reputation.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '../entities/user.entity';
 import { Feedback } from '../entities/feedback.entity';
+import { SessionEventsService } from './session-events.service';
 
 const mockUserRepo = () => ({ update: jest.fn() });
 const mockFeedbackRepo = () => ({ find: jest.fn() });
@@ -39,5 +40,20 @@ describe('ReputationService', () => {
     feedbackRepo.find.mockResolvedValue([]);
     await service.updateMentorReputation('mentor-2');
     expect(userRepo.update).toHaveBeenCalledWith('mentor-2', { reputationScore: 0 });
+  });
+});
+
+describe('SessionEventsService', () => {
+  let sessionEvents: SessionEventsService;
+  let reputationService: ReputationService;
+
+  beforeEach(() => {
+    reputationService = { updateMentorReputation: jest.fn() } as any;
+    sessionEvents = new SessionEventsService(reputationService);
+  });
+
+  it('triggers reputation update on session completion', async () => {
+    await sessionEvents.onSessionCompleted('mentor-3');
+    expect(reputationService.updateMentorReputation).toHaveBeenCalledWith('mentor-3');
   });
 });

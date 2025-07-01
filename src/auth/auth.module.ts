@@ -13,6 +13,6 @@ import { TokenBlacklistService } from './token-blacklist.service';
   imports: [TypeOrmModule.forFeature([User, ResetToken])],
   providers: [AuthService, TokenBlacklistService, MailService],
   controllers: [AuthController],
-  export: [TokenBlacklistService, AuthService],
+  exports: [TokenBlacklistService, AuthService],
 })
 export class AuthModule {}

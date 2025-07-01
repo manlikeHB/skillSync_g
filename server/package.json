@@ -27,6 +27,7 @@
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/typeorm": "^11.0.0",
     "bcrypt": "^6.0.0",
+    "ioredis": "^5.6.1",
     "joi": "^17.13.3",
     "nodemailer": "^7.0.3",
     "reflect-metadata": "^0.2.2",

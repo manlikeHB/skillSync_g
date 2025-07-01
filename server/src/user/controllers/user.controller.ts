@@ -40,9 +40,8 @@ export class UserController {
   async updateProfile(
     @Request() req,
     @Body() dto: UpdateProfileDto,
-    @UploadedFile() file: any, // Changed from Express.Multer.File to any
+    @UploadedFile() file: any,
   ) {
-    // TODO: Upload file to S3/Cloudinary and get URL
     const credentialFileUrl = file ? `uploaded/${file.originalname}` : undefined;
     return this.userService.updateProfile(req.user.id, dto, credentialFileUrl);
   }

@@ -35,6 +35,11 @@ export class User {
   @OneToMany(() => ResetToken, (token) => token.user)
   resetTokens: ResetToken[];
 
+  // ✅ From Dispute-Resolution-System
+  @Column({ type: 'float', default: 0 })
+  reputationScore: number;
+
+  // ✅ From main
   @Column({ nullable: true })
   bio: string;
 

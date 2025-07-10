@@ -45,4 +45,17 @@ export class UserService {
     if (!user) throw new NotFoundException('User not found');
     return user;
   }
+
+  async findManyByIds(userIds: (string | number)[]): Promise<User[]> {
+    return this.userRepository.findByIds(userIds);
+  }
+
+  async findAllMentors(): Promise<User[]> {
+    return this.userRepository.find({ where: { role: UserRole.MENTOR } });
+  }
+
+  // Helper to extract skills from a user entity (assuming a 'skills' field exists)
+  extractSkills(user: User): string[] {
+    return Array.isArray(user.skills) ? user.skills : [];
+  }
 }

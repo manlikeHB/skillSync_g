@@ -5,7 +5,7 @@ import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: INestApplication;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -21,5 +21,17 @@ describe('AppController (e2e)', () => {
       .get('/')
       .expect(200)
       .expect('Hello World!');
+  });
+
+  it('/user/recommend-mentors (GET)', async () => {
+    // Replace 'mentee-uuid' with a valid mentee ID in your test DB
+    const menteeId = 'mentee-uuid';
+    const n = 3;
+    const res = await request(app.getHttpServer())
+      .get(`/user/recommend-mentors?menteeId=${menteeId}&n=${n}`)
+      .expect(200);
+    expect(res.body).toHaveProperty('recommendations');
+    expect(Array.isArray(res.body.recommendations)).toBe(true);
+    expect(res.body.recommendations.length).toBeLessThanOrEqual(n);
   });
 });

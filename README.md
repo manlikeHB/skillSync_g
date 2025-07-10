@@ -96,3 +96,163 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+---
+
+# Mentor-Mentee Recommendation Algorithm Documentation
+
+## Overview
+
+This system provides intelligent mentor recommendations for mentees by combining state-of-the-art collaborative filtering (CF) and content-based (semantic skill matching) approaches. The hybrid algorithm leverages both historical interaction data and semantic similarity of skills, ensuring accurate, relevant, and explainable matches.
+
+## Architecture
+
+**Components:**
+- **NestJS Backend:** Orchestrates data flow, exposes API endpoints, and combines recommendation signals.
+- **Python Microservice (FastAPI):** Computes semantic similarity between mentee and mentor skills using sentence-transformers.
+- **Collaborative Filtering Service (Python, e.g., LightFM):** Provides mentor recommendations based on historical interaction data.
+
+**Data Flow:**
+1. Mentee requests recommendations via the NestJS API.
+2. NestJS fetches mentee and mentor profiles from the database.
+3. NestJS batches all mentor skills and sends them, along with the mentee’s skills, to the Python microservice for semantic similarity scoring.
+4. NestJS queries the collaborative filtering service for top mentor recommendations based on past interactions.
+5. NestJS combines both signals (and optionally other features) into a hybrid score, ranks mentors, and returns the top N.
+
+## Algorithm Details
+
+### 1. Content-Based (Semantic Skill Matching)
+- **Input:** Mentee’s skills, each mentor’s skills.
+- **Process:**  
+  - Both skill lists are embedded using a pre-trained sentence-transformer model.
+  - The maximum cosine similarity between any mentee and mentor skill embedding is computed.
+- **Output:** A semantic similarity score (0–1) for each mentor.
+
+### 2. Collaborative Filtering
+- **Input:** Mentee ID, historical mentor-mentee interaction data.
+- **Process:**  
+  - A collaborative filtering model (e.g., LightFM) is trained on past pairings, feedback, and ratings.
+  - The model predicts the top N mentors for the given mentee.
+- **Output:** A list of mentor IDs, optionally with confidence scores.
+
+### 3. Hybrid Scoring
+- **Inputs:** Semantic similarity scores, collaborative filtering results, and optional features (e.g., availability, reputation).
+- **Process:**  
+  - Each mentor receives a hybrid score, e.g.:
+    ```
+    hybridScore = 0.6 * semanticSkillScore + 0.3 * cfScore + 0.1 * (other features)
+    ```
+    - `semanticSkillScore`: From the Python microservice.
+    - `cfScore`: 1 if mentor is in the CF top-N, else 0.
+    - `other features`: e.g., availability, reputation, feedback.
+  - Mentors are sorted by hybrid score.
+- **Output:** Top N mentors, ranked.
+
+## API Endpoints
+
+### 1. NestJS Recommendation Endpoint
+
+```
+GET /user/recommend-mentors?menteeId=<mentee_id>&n=<N>
+```
+
+**Parameters:**
+- `menteeId` (string): The UUID of the mentee.
+- `n` (number, optional): Number of recommendations to return (default: 5).
+
+**Response:**
+```json
+{
+  "recommendations": [
+    {
+      "id": "mentor-uuid-1",
+      "name": "Jane Mentor",
+      "skills": ["AI", "ML", "Python"],
+      "semanticSkillScore": 0.92,
+      "hybridScore": 0.85,
+      "availability": "available",
+      "reputationScore": 4.8
+    },
+    ...
+  ]
+}
+```
+
+### 2. Python Microservice Endpoints
+
+#### a. Batch Semantic Similarity
+
+```
+POST /batch-similarity
+```
+**Request Body:**
+```json
+{
+  "mentee_skills": ["AI", "machine learning"],
+  "mentors": [
+    {"id": "mentor-uuid-1", "skills": ["AI", "ML", "Python"]},
+    {"id": "mentor-uuid-2", "skills": ["Data Science", "Statistics"]}
+  ]
+}
+```
+**Response:**
+```json
+{
+  "similarities": [
+    {"id": "mentor-uuid-1", "similarity": 0.92},
+    {"id": "mentor-uuid-2", "similarity": 0.67}
+  ]
+}
+```
+
+#### b. Collaborative Filtering
+
+```
+GET /recommend?mentee_id=<mentee_id>&n=<N>
+```
+**Response:**
+```json
+{
+  "recommendations": ["mentor-uuid-1", "mentor-uuid-3", ...]
+}
+```
+
+## Extensibility
+
+- **Add more features:** Incorporate mentor availability, reputation, or feedback into the hybrid score.
+- **Tune weights:** Adjust the hybrid score formula to optimize for your platform’s goals.
+- **A/B testing:** Experiment with different algorithms and weights to maximize user satisfaction.
+- **Caching:** For large mentor pools, cache or precompute similarity scores for efficiency.
+
+## Deployment
+
+- **Docker Compose** is recommended for orchestrating the NestJS and Python services.
+- **Environment variables** should be used to configure service URLs and ports.
+- **Scalability:** Both services can be scaled independently.
+
+## Frontend Integration
+
+- Call the `/user/recommend-mentors` endpoint to fetch recommendations.
+- Display mentor cards with names, skills, and match explanations (e.g., “Top match due to shared skills in AI and ML”).
+- Optionally, allow mentees to provide feedback to further improve recommendations.
+
+## Example Hybrid Score Calculation
+
+```typescript
+const hybridScore = 0.6 * semanticSkillScore + 0.3 * cfScore + 0.1 * (availabilityScore + reputationScore);
+```
+- `semanticSkillScore`: [0, 1] from semantic similarity.
+- `cfScore`: 1 if mentor is in CF top-N, else 0.
+- `availabilityScore`: 0.1 if available, else 0.
+- `reputationScore`: (mentor.reputationScore / 5) * 0.1.
+
+## References
+
+- [LightFM: Hybrid Recommender](https://making.lyst.com/lightfm/docs/home.html)
+- [Sentence Transformers](https://www.sbert.net/)
+- [NestJS Documentation](https://docs.nestjs.com/)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+
+## Contact
+
+For questions or contributions, please contact the maintainers or open an issue in the repository.

@@ -1,0 +1,64 @@
+import { Injectable } from '@nestjs/common';
+import { NotificationService } from '../notifications/services/notification.service';
+
+@Injectable()
+export class MatchesService {
+  constructor(
+    private notificationService: NotificationService,
+    // ... other dependencies
+  ) {}
+
+  async createMatch(mentorId: string, menteeId: string, matchData: any) {
+    // Create the match in your database
+    const match = await this.matchRepository.save({
+      mentorId,
+      menteeId,
+      ...matchData,
+    });
+
+    // Send notifications
+    await this.notificationService.notifyMatchCreated(
+      match.id,
+      mentorId,
+      menteeId,
+      matchData
+    );
+
+    return match;
+  }
+
+  async updateMatch(matchId: string, updateData: any) {
+    const match = await this.matchRepository.findOne({ where: { id: matchId } });
+    
+    // Update the match
+    const updatedMatch = await this.matchRepository.save({
+      ...match,
+      ...updateData,
+    });
+
+    // Send notifications
+    await this.notificationService.notifyMatchUpdated(
+      matchId,
+      match.mentorId,
+      match.menteeId,
+      updateData
+    );
+
+    return updatedMatch;
+  }
+
+  async cancelMatch(matchId: string, reason?: string) {
+    const match = await this.matchRepository.findOne({ where: { id: matchId } });
+    
+    // Cancel the match
+    await this.matchRepository.update(matchId, { status: 'CANCELLED' });
+
+    // Send notifications
+    await this.notificationService.notifyMatchCancelled(
+      matchId,
+      match.mentorId,
+      match.menteeId,
+      reason
+    );
+  }
+}

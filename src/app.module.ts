@@ -8,6 +8,7 @@ import { HealthController } from './app.controller';
 import { RedisModule } from './redis/redis.module';
 import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from './config/env.validation';
+import { MatchingModule } from './matching/matching.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { envValidationSchema } from './config/env.validation';
     UserModule,
     DatabaseModule,
     RedisModule,
+    MatchingModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { DataPreprocessingConfig } from '../interfaces/data-preprocessing-config.interface';
 import { DataQualityMetrics } from '../interfaces/data-quality-metrics.interface';
 import { DataType } from '../enums/data-type.enum';
@@ -28,6 +28,18 @@ export class DataPreprocessingService {
 
     try {
       this.logger.log(`Starting data preprocessing for ${dataType} with ${originalCount} records`);
+
+      // Validate config structure
+      if (!config || typeof config !== 'object') {
+        this.logger.warn('Invalid preprocessing configuration provided.');
+        throw new BadRequestException('Invalid preprocessing configuration.');
+      }
+
+      // Defensive: Ensure required config sections exist
+      if (!config.outlierDetection || !config.featureEngineering || !config.normalization || !config.encoding) {
+        this.logger.warn('Missing required preprocessing configuration sections.');
+        throw new BadRequestException('Missing required preprocessing configuration sections.');
+      }
 
       // Step 1: Outlier Detection and Removal
       if (config.outlierDetection.enabled) {
@@ -76,7 +88,8 @@ export class DataPreprocessingService {
 
     } catch (error) {
       this.logger.error(`Data preprocessing failed: ${error.message}`, error.stack);
-      throw new BadRequestException(`Data preprocessing failed: ${error.message}`);
+      if (error instanceof BadRequestException) throw error;
+      throw new InternalServerErrorException(`Data preprocessing failed: ${error.message}`);
     }
   }
 

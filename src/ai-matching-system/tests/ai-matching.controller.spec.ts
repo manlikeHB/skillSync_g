@@ -39,11 +39,13 @@ describe('AiMatchingController', () => {
   };
 
   const mockDataPreprocessingService = {
-    preprocessBatch: jest.fn()
+    preprocessBatch: jest.fn(),
+    preprocessData: jest.fn(),
   };
 
   const mockDataAnonymizationService = {
-    anonymizeBatch: jest.fn()
+    anonymizeBatch: jest.fn(),
+    anonymizeData: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -816,6 +818,84 @@ describe('AiMatchingController', () => {
       expect(result.compliance).toBeDefined();
       expect(result.risks).toBeDefined();
       expect(result.recommendations).toBeDefined();
+    });
+  });
+
+  describe('collectPreprocessAnonymize', () => {
+    it('should collect, preprocess, and anonymize data in a single workflow', async () => {
+      const createDto = {
+        userId: 'user-123',
+        dataType: DataType.MENTOR_PROFILE,
+        rawData: {
+          name: 'John Doe',
+          email: 'john@example.com',
+          skills: ['JavaScript', 'React'],
+          experienceYears: 5,
+        },
+        privacyMetadata: {
+          anonymizationLevel: 'medium',
+          dataRetentionDays: 30,
+          consentGiven: true,
+          consentDate: new Date().toISOString(),
+          dataCategories: ['personal', 'professional'],
+        },
+      };
+
+      const processingDto = {
+        configuration: {
+          preprocessing: {
+            outlierDetection: { enabled: false, method: 'iqr', threshold: 1.5 },
+            featureEngineering: { enabled: false, features: [], transformations: {} },
+            normalization: { enabled: false, method: 'minmax', fields: [] },
+            encoding: { enabled: false, method: 'label', categoricalFields: [] },
+          },
+          anonymization: {
+            anonymizationLevel: 'medium',
+            dataRetentionDays: 30,
+            consentGiven: true,
+            dataCategories: ['personal', 'professional'],
+          },
+        },
+        inputData: {
+          dataCollectionIds: [],
+        },
+      };
+
+      // Mock the service methods
+      const mockCollection = { id: 'collection-123', ...createDto };
+      const mockProcessedData = [{ ...createDto.rawData, processed: true }];
+      const mockPreprocessingMetrics = { originalCount: 1, processedCount: 1, outliersRemoved: 0, featuresEngineered: 0, processingTime: 10 };
+      const mockQualityMetrics = { completeness: 1, accuracy: 1, consistency: 1, timeliness: 1, validity: 1, uniqueness: 1, overallScore: 1 };
+      const mockAnonymizedData = { ...mockProcessedData[0], anonymized: true };
+      const mockPrivacyMetrics = { kAnonymity: 1, lDiversity: 1, tCloseness: 1, differentialPrivacy: 0, reidentificationRisk: 0, kAnonymityLevel: 1, lDiversityLevel: 1, tClosenessLevel: 1, informationLoss: 0, privacyGain: 1, anonymizationRatio: 1, dataRetentionCompliance: true, consentCompliance: true };
+      const mockMetadata = { processingTime: 10, techniquesApplied: ['k-anonymity'], originalRecordCount: 1, anonymizedRecordCount: 1, dataRetentionDays: 30, anonymizationLevel: 'medium' };
+
+      mockDataCollectionService.create.mockResolvedValue(mockCollection);
+      mockDataPreprocessingService.preprocessData.mockResolvedValue({
+        processedData: mockProcessedData,
+        preprocessingMetrics: mockPreprocessingMetrics,
+        qualityMetrics: mockQualityMetrics,
+      });
+      mockDataCollectionService.update.mockResolvedValue({ ...mockCollection, processedData: mockProcessedData[0] });
+      mockDataAnonymizationService.anonymizeData.mockResolvedValue({
+        anonymizedData: mockAnonymizedData,
+        privacyMetrics: mockPrivacyMetrics,
+        metadata: mockMetadata,
+      });
+
+      const result = await controller.collectPreprocessAnonymize(createDto, processingDto);
+
+      expect(result).toEqual({
+        collectionId: 'collection-123',
+        preprocessingMetrics: mockPreprocessingMetrics,
+        qualityMetrics: mockQualityMetrics,
+        privacyMetrics: mockPrivacyMetrics,
+        status: 'completed',
+      });
+      expect(mockDataCollectionService.create).toHaveBeenCalledWith(createDto);
+      expect(mockDataPreprocessingService.preprocessData).toHaveBeenCalled();
+      expect(mockDataCollectionService.update).toHaveBeenCalled();
+      expect(mockDataAnonymizationService.anonymizeData).toHaveBeenCalled();
     });
   });
 }); 

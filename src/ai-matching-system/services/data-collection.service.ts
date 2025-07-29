@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DataCollection } from '../entities/data-collection.entity';
@@ -9,6 +9,7 @@ import { WorkflowType } from '../enums/workflow-type.enum';
 import { WorkflowStatus } from '../enums/workflow-status.enum';
 import { CreateDataCollectionDto, UpdateDataCollectionDto, DataCollectionQueryDto } from '../dtos/data-collection.dto';
 import { CreateDataProcessingDto, DataProcessingQueryDto } from '../dtos/data-processing.dto';
+import { DataValidationService } from './data-validation.service';
 
 @Injectable()
 export class DataCollectionService {
@@ -18,7 +19,8 @@ export class DataCollectionService {
     @InjectRepository(DataCollection)
     private readonly dataCollectionRepository: Repository<DataCollection>,
     @InjectRepository(DataWorkflow)
-    private readonly dataWorkflowRepository: Repository<DataWorkflow>
+    private readonly dataWorkflowRepository: Repository<DataWorkflow>,
+    private readonly dataValidationService: DataValidationService 
   ) {}
 
   // Data Collection Operations
@@ -27,12 +29,38 @@ export class DataCollectionService {
     try {
       this.logger.log(`Creating data collection for user: ${createDto.userId}`);
 
+      // Privacy/consent check
+      if (!createDto.privacyMetadata?.consentGiven) {
+        this.logger.warn('User consent is required for data collection.');
+        throw new BadRequestException('User consent is required for data collection.');
+      }
+
+      // Run validation on rawData
+      const validationResult = await this.dataValidationService.validateData(
+        createDto.rawData,
+        createDto.dataType
+      );
+
+      const isValid = validationResult.isValid;
+
+      // If invalid, return detailed validation errors to the client
+      if (!isValid) {
+        this.logger.warn(`Validation failed: ${validationResult.errors.join('; ')}`);
+        throw new BadRequestException({
+          message: 'Validation failed',
+          errors: validationResult.errors,
+          warnings: validationResult.warnings,
+        });
+      }
+
       const dataCollection = this.dataCollectionRepository.create({
         userId: createDto.userId,
         dataType: createDto.dataType,
         status: DataStatus.COLLECTED,
         rawData: createDto.rawData,
-        privacyMetadata: createDto.privacyMetadata
+        privacyMetadata: createDto.privacyMetadata,
+        validationResults: validationResult,
+        errorMessage: undefined,
       });
 
       const savedCollection = await this.dataCollectionRepository.save(dataCollection);
@@ -41,7 +69,8 @@ export class DataCollectionService {
       return savedCollection;
     } catch (error) {
       this.logger.error(`Error creating data collection: ${error.message}`, error.stack);
-      throw new Error(`Failed to create data collection: ${error.message}`);
+      if (error instanceof BadRequestException) throw error;
+      throw new InternalServerErrorException(`Failed to create data collection: ${error.message}`);
     }
   }
 
@@ -526,8 +555,7 @@ export class DataCollectionService {
         where: { status: WorkflowStatus.COMPLETED }
       });
 
-      // In a real implementation, you might move these to an archive table
-      // For now, we'll just mark them as archived in the logs
+      
       this.logger.log(`Found ${completedWorkflows.length} completed workflows to archive`);
 
       return completedWorkflows.length;

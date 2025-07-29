@@ -166,6 +166,91 @@ export class AiMatchingController {
     }
   }
 
+  /**
+   * Orchestrated endpoint: Collect, preprocess, and anonymize mentor/mentee data
+   */
+  @Post('workflow/collect-preprocess-anonymize')
+  @Roles(UserRole.ADMIN, UserRole.MENTOR, UserRole.MENTEE)
+  @ApiOperation({ summary: 'Collect, preprocess, and anonymize mentor/mentee data in a single workflow' })
+  @ApiResponse({ status: 201, description: 'Workflow completed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input or workflow error' })
+  async collectPreprocessAnonymize(
+    @Body('collection') createDto: CreateDataCollectionDto,
+    @Body('processing') processingDto: CreateDataProcessingDto
+  ): Promise<any> {
+    try {
+      this.logger.log(`Starting full workflow for user: ${createDto.userId}`);
+
+      // 1. Collect and validate data
+      const collection = await this.dataCollectionService.create(createDto);
+
+      // Provide default configs if missing
+      const defaultPreprocessingConfig: DataPreprocessingConfig = {
+        outlierDetection: { enabled: false, method: 'iqr', threshold: 1.5 },
+        featureEngineering: { enabled: false, features: [], transformations: {} },
+        normalization: { enabled: false, method: 'minmax', fields: [] },
+        encoding: { enabled: false, method: 'label', categoricalFields: [] },
+      };
+      const isValidPreprocessingConfig = (config: any): config is DataPreprocessingConfig =>
+        config && typeof config.normalization !== 'undefined' && typeof config.encoding !== 'undefined' && typeof config.featureEngineering !== 'undefined' && typeof config.outlierDetection !== 'undefined';
+      const preprocessingConfig: DataPreprocessingConfig =
+        isValidPreprocessingConfig(processingDto.configuration.preprocessing)
+          ? processingDto.configuration.preprocessing
+          : defaultPreprocessingConfig;
+
+      const defaultAnonymizationConfig: DataAnonymizationConfig = {
+        anonymizationLevel: 'medium',
+        dataRetentionDays: 30,
+        consentGiven: true,
+        dataCategories: [],
+      };
+      const isValidAnonymizationConfig = (config: any): config is DataAnonymizationConfig =>
+        config && typeof config.anonymizationLevel !== 'undefined' && typeof config.dataRetentionDays !== 'undefined' && typeof config.consentGiven !== 'undefined' && typeof config.dataCategories !== 'undefined';
+      const anonymizationConfig: DataAnonymizationConfig =
+        isValidAnonymizationConfig(processingDto.configuration.anonymization)
+          ? processingDto.configuration.anonymization
+          : defaultAnonymizationConfig;
+
+      // 2. Preprocess data
+      const { processedData, preprocessingMetrics, qualityMetrics } =
+        await this.dataPreprocessingService.preprocessData([collection.rawData], preprocessingConfig, collection.dataType);
+
+      // 3. Update collection with processed data
+      await this.dataCollectionService.update(collection.id, { processedData: processedData[0] });
+
+      // 4. Anonymize data
+      const { anonymizedData, privacyMetrics, metadata } =
+        await this.dataAnonymizationService.anonymizeData(processedData[0], anonymizationConfig, collection.dataType);
+
+      // 5. Update collection with anonymized data and privacy metrics
+      await this.dataCollectionService.update(collection.id, {
+        anonymizedData,
+        privacyMetadata: {
+          anonymizationLevel: anonymizationConfig.anonymizationLevel ?? 'medium',
+          dataRetentionDays: anonymizationConfig.dataRetentionDays ?? 30,
+          consentGiven: anonymizationConfig.consentGiven ?? true,
+          consentDate: new Date().toISOString(),
+          dataCategories: anonymizationConfig.dataCategories ?? [],
+        },
+        processingMetadata: metadata,
+      });
+
+      return {
+        collectionId: collection.id,
+        preprocessingMetrics,
+        qualityMetrics,
+        privacyMetrics,
+        status: 'completed',
+      };
+    } catch (error) {
+      this.logger.error(`Error in full workflow: ${error.message}`);
+      throw new HttpException(
+        `Workflow failed: ${error.message}`,
+        HttpStatus.BAD_REQUEST
+      );
+    }
+  }
+
   // Data Processing Workflow Endpoints
 
   @Post('workflow/validate')
@@ -178,25 +263,21 @@ export class AiMatchingController {
   }> {
     try {
       this.logger.log('Starting data validation workflow');
-      
       // Create workflow record
       const workflow = await this.dataCollectionService.createWorkflow({
         workflowType: WorkflowType.DATA_VALIDATION,
         configuration: processingDto.configuration,
         inputData: processingDto.inputData
       });
-
       // Get data collections to validate
       const collections = await this.dataCollectionService.findByIds(
         processingDto.inputData.dataCollectionIds
       );
-
       // Run validation
       const validationResults = await this.dataValidationService.validateBatch(
         collections.map(c => c.rawData),
         collections[0]?.dataType || DataType.MENTOR_PROFILE
       );
-
       // Update workflow with results
       await this.dataCollectionService.updateWorkflow(workflow.id, {
         status: WorkflowStatus.COMPLETED,
@@ -217,10 +298,8 @@ export class AiMatchingController {
           warningCount: 0
         }
       });
-
       const updatedWorkflow = await this.dataCollectionService.findWorkflowById(workflow.id);
       if (!updatedWorkflow) throw new HttpException('Workflow not found', HttpStatus.INTERNAL_SERVER_ERROR);
-
       return {
         workflow: updatedWorkflow,
         results: validationResults
@@ -244,20 +323,16 @@ export class AiMatchingController {
   }> {
     try {
       this.logger.log('Starting data preprocessing workflow');
-      
       // Create workflow record
       const workflow = await this.dataCollectionService.createWorkflow({
         workflowType: WorkflowType.DATA_PREPROCESSING,
         configuration: processingDto.configuration,
         inputData: processingDto.inputData
       });
-
       // Get data collections to preprocess
       const collections = await this.dataCollectionService.findByIds(
         processingDto.inputData.dataCollectionIds
       );
-
-      // Fix DataPreprocessingConfig usage, outputData, workflow null checks, and remove preprocessBatch/calculateQualityMetrics as described above
       const defaultPreprocessingConfig: DataPreprocessingConfig = {
         normalization: { enabled: false, method: 'minmax', fields: [] },
         encoding: { enabled: false, method: 'onehot', categoricalFields: [] },
@@ -266,18 +341,15 @@ export class AiMatchingController {
       };
       const isValidPreprocessingConfig = (config: any): config is DataPreprocessingConfig =>
         config && typeof config.normalization !== 'undefined' && typeof config.encoding !== 'undefined' && typeof config.featureEngineering !== 'undefined' && typeof config.outlierDetection !== 'undefined';
-
       const preprocessingConfig: DataPreprocessingConfig =
         isValidPreprocessingConfig(processingDto.configuration.preprocessing)
           ? processingDto.configuration.preprocessing
           : defaultPreprocessingConfig;
-
       const preprocessingResults = await this.dataPreprocessingService.preprocessData(
         collections,
         preprocessingConfig,
         collections[0]?.dataType || DataType.MENTOR_PROFILE
       );
-
       // Update workflow with results
       await this.dataCollectionService.updateWorkflow(workflow.id, {
         status: WorkflowStatus.COMPLETED,
@@ -298,10 +370,8 @@ export class AiMatchingController {
           warningCount: 0
         }
       });
-
       const updatedWorkflow = await this.dataCollectionService.findWorkflowById(workflow.id);
       if (!updatedWorkflow) throw new HttpException('Workflow not found', HttpStatus.INTERNAL_SERVER_ERROR);
-
       return {
         workflow: updatedWorkflow,
         results: preprocessingResults

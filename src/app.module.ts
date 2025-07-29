@@ -10,6 +10,7 @@ import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from './config/env.validation';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { MatchingModule } from './matching/matching.module';
+import { AiMatchingSystemModule } from './ai-matching-system/ai-matching-system.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { MatchingModule } from './matching/matching.module';
     RedisModule,
     RecommendationsModule,
     MatchingModule,
+    AiMatchingSystemModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
